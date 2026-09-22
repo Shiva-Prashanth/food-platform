@@ -1,0 +1,11 @@
+food_item,prepared_time,assessment_time,storage_condition,temperature,smell
+Rice,2026-08-21 12:00,2026-08-21 14:00,room_temperature,29,normal
+Rice,2026-08-21 12:00,2026-08-21 17:00,room_temperature,29,normal
+Rice,2026-08-21 12:00,2026-08-21 15:00,high_temperature,34,unusual
+Rice,2026-08-21 12:00,2026-08-21 16:00,refrigerated,4,normal
+Dal,2026-08-21 13:00,2026-08-21 15:00,room_temperature,28,normal
+Dal,2026-08-21 13:00,2026-08-21 18:00,high_temperature,33,bad
+Biryani,2026-08-21 12:30,2026-08-21 14:30,room_temperature,29,normal
+Biryani,2026-08-21 12:30,2026-08-21 17:30,room_temperature,29,unusual
+Curd_Rice,2026-08-21 12:00,2026-08-21 14:00,refrigerated,4,normal
+Curd_Rice,2026-08-21 12:00,2026-08-21 16:00,room_temperature,30,unusual

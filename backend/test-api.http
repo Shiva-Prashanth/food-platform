@@ -1,0 +1,31 @@
+
+POST http://localhost:5000/api/receivers
+Content-Type: application/json
+
+{
+  "name": "ABC Orphanage",
+  "location": "Area 1",
+  "foodNeeded": "cooked food",
+  "quantityNeeded": "MEDIUM",
+  "available": true
+}
+
+### Get all receivers
+
+GET http://localhost:5000/api/receivers
+
+### Create donation
+
+POST http://localhost:5000/api/donations
+Content-Type: application/json
+
+{
+    "food": "uttapam",
+    "route": "HUMAN",
+    "quantity": "MEDIUM",
+    "location": "Area 1"
+}
+
+### Get all donations
+
+GET http://localhost:5000/api/donations
