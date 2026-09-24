@@ -148,7 +148,7 @@ export default function Home() {
   useEffect(() => {
     async function loadMetrics() {
       try {
-        const response = await fetch("http://localhost:5000/api/receivers");
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/receivers`);
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data.receivers)) {

@@ -48,7 +48,7 @@ type PendingValidation = {
     allocationStatus?: string | null;
 };
 
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = `${process.env.NEXT_PUBLIC_API_URL}/api`;
 const SESSION_STORAGE_KEY = "smart-surplus-hostel-donation-session";
 
 const routeLabels: Record<string, string> = {
@@ -1136,7 +1136,7 @@ export default function HostelPage() {
                                                     <div className="w-14 h-14 rounded-2xl bg-[#DDF3F4] border border-[#D5E7EA] flex items-center justify-center text-2xl shrink-0 overflow-hidden">
                                                         {item.imagePath ? (
                                                             <img
-                                                                src={`http://localhost:5000${item.imagePath}`}
+                                                                src={`${process.env.NEXT_PUBLIC_API_URL}${item.imagePath}`}
                                                                 alt={`Item ${index + 1}`}
                                                                 className="w-full h-full object-cover"
                                                                 onError={(e) => {
