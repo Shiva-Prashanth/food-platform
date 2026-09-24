@@ -17,7 +17,6 @@ if PROJECT_ROOT not in sys.path:
 
 import numpy as np
 import tensorflow as tf
-from transformers import pipeline
 
 
 from rules.assessment_rules import (
@@ -45,22 +44,50 @@ IMAGE_SIZE = (224, 224)
 
 
 # ============================================================
-# LOAD MODELS
+# MODEL VARIABLES
 # ============================================================
 
-# Model 1 - Food identification
-# Using pretrained Hugging Face model
-food_model = pipeline(
-    "image-classification",
-    model="Subhash5/indian-food-classifier"
-)
+food_model = None
+freshness_model = None
 
 
-# Model 2 - Freshness prediction
-# Existing model - DO NOT CHANGE
-freshness_model = tf.keras.models.load_model(
-    FRESHNESS_MODEL_PATH
-)
+# ============================================================
+# LOAD FOOD MODEL WHEN NEEDED
+# ============================================================
+
+def get_food_model():
+
+    global food_model
+
+    if food_model is None:
+
+        from transformers import pipeline
+
+        food_model = pipeline(
+            "image-classification",
+            model="Subhash5/indian-food-classifier"
+        )
+
+    return food_model
+
+
+# ============================================================
+# LOAD FRESHNESS MODEL WHEN NEEDED
+# ============================================================
+
+def get_freshness_model():
+
+    global freshness_model
+
+    if freshness_model is None:
+
+        freshness_model = (
+            tf.keras.models.load_model(
+                FRESHNESS_MODEL_PATH
+            )
+        )
+
+    return freshness_model
 
 
 # ============================================================
@@ -69,9 +96,15 @@ freshness_model = tf.keras.models.load_model(
 
 def predict_food(image_path):
 
+    # --------------------------------------------------------
+    # Load food model only when prediction is requested
+    # --------------------------------------------------------
+
+    model = get_food_model()
+
     # The Hugging Face image-classification pipeline
     # handles image loading and preprocessing.
-    predictions = food_model(
+    predictions = model(
         image_path
     )
 
@@ -93,6 +126,12 @@ def predict_food(image_path):
 
 def predict_freshness(image_path):
 
+    # --------------------------------------------------------
+    # Load freshness model only when prediction is requested
+    # --------------------------------------------------------
+
+    model = get_freshness_model()
+
     image = tf.keras.utils.load_img(
         image_path,
         target_size=IMAGE_SIZE
@@ -107,7 +146,7 @@ def predict_freshness(image_path):
         axis=0
     )
 
-    prediction = freshness_model.predict(
+    prediction = model.predict(
         image_array,
         verbose=0
     )[0][0]
