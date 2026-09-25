@@ -96,21 +96,19 @@ def get_freshness_model():
 
 def predict_food(image_path):
 
-    print("========== MODEL 1 START ==========", flush=True)
-
-    print("Loading food classification model...", flush=True)
+    # --------------------------------------------------------
+    # Load food model only when prediction is requested
+    # --------------------------------------------------------
 
     model = get_food_model()
 
-    print("Food classification model loaded.", flush=True)
-    print("Running food prediction...", flush=True)
-
+    # The Hugging Face image-classification pipeline
+    # handles image loading and preprocessing.
     predictions = model(
         image_path
     )
 
-    print("Food prediction completed.", flush=True)
-
+    # Get the highest-confidence prediction
     best_prediction = predictions[0]
 
     food_name = best_prediction["label"]
@@ -119,28 +117,20 @@ def predict_food(image_path):
         best_prediction["score"] * 100
     )
 
-    print(
-        f"Food: {food_name}, Confidence: {confidence:.2f}%",
-        flush=True
-    )
-
-    print("========== MODEL 1 END ==========", flush=True)
-
     return food_name, confidence
+
+
 # ============================================================
 # MODEL 2 - FRESHNESS PREDICTION
 # ============================================================
 
 def predict_freshness(image_path):
 
-    print("========== MODEL 2 START ==========", flush=True)
-
-    print("Loading freshness model...", flush=True)
+    # --------------------------------------------------------
+    # Load freshness model only when prediction is requested
+    # --------------------------------------------------------
 
     model = get_freshness_model()
-
-    print("Freshness model loaded.", flush=True)
-    print("Preparing image...", flush=True)
 
     image = tf.keras.utils.load_img(
         image_path,
@@ -156,14 +146,13 @@ def predict_freshness(image_path):
         axis=0
     )
 
-    print("Running freshness prediction...", flush=True)
-
     prediction = model.predict(
         image_array,
         verbose=0
     )[0][0]
 
-    print("Freshness prediction completed.", flush=True)
+    # bad = 0
+    # good = 1
 
     good_percentage = prediction * 100
 
@@ -172,22 +161,16 @@ def predict_freshness(image_path):
     )
 
     if good_percentage >= 70:
+
         visual_assessment = "GOOD"
 
     elif bad_percentage >= 70:
+
         visual_assessment = "BAD"
 
     else:
+
         visual_assessment = "UNCERTAIN"
-
-    print(
-        f"Freshness: good={good_percentage:.2f}%, "
-        f"bad={bad_percentage:.2f}%, "
-        f"assessment={visual_assessment}",
-        flush=True
-    )
-
-    print("========== MODEL 2 END ==========", flush=True)
 
     return (
         good_percentage,
