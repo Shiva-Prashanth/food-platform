@@ -122,10 +122,33 @@ def get_food_model():
             flush=True
         )
 
+        print("MODEL 1: importing torchvision START", flush=True)
+
+        torchvision_start = time.perf_counter()
+
+        import torchvision
+
         print(
-            "MODEL 1: importing pipeline START",
+            "MODEL 1: importing torchvision DONE - "
+            f"version={torchvision.__version__} - "
+            f"time={time.perf_counter() - torchvision_start:.2f}s",
             flush=True
         )
+
+        print("MODEL 1: importing tensorflow START", flush=True)
+
+        tensorflow_start = time.perf_counter()
+
+        import tensorflow as tf
+
+        print(
+            "MODEL 1: importing tensorflow DONE - "
+            f"version={tf.__version__} - "
+            f"time={time.perf_counter() - tensorflow_start:.2f}s",
+            flush=True
+        )
+
+        print("MODEL 1: importing pipeline START", flush=True)
 
         pipeline_start = time.perf_counter()
 
@@ -136,7 +159,6 @@ def get_food_model():
             f"time={time.perf_counter() - pipeline_start:.2f}s",
             flush=True
         )
-
         print(
             "MODEL 1: pipeline/model creation START",
             flush=True
