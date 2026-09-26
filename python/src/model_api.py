@@ -1,3 +1,4 @@
+from src.batch_pipeline import process_food_item
 from flask import Flask, request, jsonify
 import os
 import sys
@@ -19,7 +20,7 @@ if PROJECT_ROOT not in sys.path:
 # IMPORT BATCH PIPELINE
 # ============================================================
 
-from src.batch_pipeline import process_food_item
+# ML pipeline is loaded lazily inside /analyze-food
 
 
 # ============================================================
@@ -238,6 +239,7 @@ def analyze_food():
         # ====================================================
         # RUN MODEL 1 + MODEL 2 + MODEL 3
         # ====================================================
+        from src.batch_pipeline import process_food_item
 
         result = process_food_item(
             image_path,
@@ -308,7 +310,7 @@ if __name__ == "__main__":
     )
 
     app.run(
-        host="127.0.0.1",
+        host="[IP_ADDRESS]",
         port=8000,
         debug=False
     )
