@@ -78,7 +78,6 @@ def _load_numpy():
 # ============================================================
 
 def get_food_model():
-
     global food_model
 
     if food_model is None:
@@ -90,7 +89,25 @@ def get_food_model():
 
         load_start = time.perf_counter()
 
+        print(
+            "MODEL 1: importing transformers START",
+            flush=True
+        )
+
         from transformers import pipeline
+
+        print(
+            "MODEL 1: importing transformers DONE in "
+            f"{time.perf_counter() - load_start:.2f}s",
+            flush=True
+        )
+
+        model_start = time.perf_counter()
+
+        print(
+            "MODEL 1: pipeline/model creation START",
+            flush=True
+        )
 
         food_model = pipeline(
             "image-classification",
@@ -99,13 +116,18 @@ def get_food_model():
         )
 
         print(
-            f"MODEL 1: Hugging Face model LOAD DONE in "
+            "MODEL 1: pipeline/model creation DONE in "
+            f"{time.perf_counter() - model_start:.2f}s",
+            flush=True
+        )
+
+        print(
+            "MODEL 1: Hugging Face model LOAD DONE in "
             f"{time.perf_counter() - load_start:.2f}s",
             flush=True
         )
 
     return food_model
-
 
 
 # ============================================================
