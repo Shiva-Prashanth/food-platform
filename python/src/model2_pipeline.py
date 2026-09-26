@@ -78,6 +78,7 @@ def _load_numpy():
 # ============================================================
 
 def get_food_model():
+
     global food_model
 
     if food_model is None:
@@ -89,34 +90,28 @@ def get_food_model():
 
         load_start = time.perf_counter()
 
-        # --------------------------------------------------------
-        # TEST 1: PyTorch import
-        # --------------------------------------------------------
-
         print(
             "MODEL 1: importing torch START",
             flush=True
         )
+
+        torch_start = time.perf_counter()
 
         import torch
 
         print(
             "MODEL 1: importing torch DONE - "
             f"version={torch.__version__} - "
-            f"time={time.perf_counter() - load_start:.2f}s",
+            f"time={time.perf_counter() - torch_start:.2f}s",
             flush=True
         )
-
-        # --------------------------------------------------------
-        # TEST 2: Transformers import
-        # --------------------------------------------------------
-
-        transformers_start = time.perf_counter()
 
         print(
             "MODEL 1: importing transformers START",
             flush=True
         )
+
+        transformers_start = time.perf_counter()
 
         import transformers
 
@@ -127,16 +122,12 @@ def get_food_model():
             flush=True
         )
 
-        # --------------------------------------------------------
-        # TEST 3: Pipeline import
-        # --------------------------------------------------------
-
-        pipeline_start = time.perf_counter()
-
         print(
             "MODEL 1: importing pipeline START",
             flush=True
         )
+
+        pipeline_start = time.perf_counter()
 
         from transformers import pipeline
 
@@ -146,16 +137,12 @@ def get_food_model():
             flush=True
         )
 
-        # --------------------------------------------------------
-        # TEST 4: Actual model loading
-        # --------------------------------------------------------
-
-        model_start = time.perf_counter()
-
         print(
             "MODEL 1: pipeline/model creation START",
             flush=True
         )
+
+        model_start = time.perf_counter()
 
         food_model = pipeline(
             "image-classification",
@@ -176,7 +163,6 @@ def get_food_model():
         )
 
     return food_model
-
 
 # ============================================================
 # LOAD FRESHNESS MODEL WHEN NEEDED
