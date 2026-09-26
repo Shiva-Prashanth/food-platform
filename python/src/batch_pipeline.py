@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 # ============================================================
 # PROJECT ROOT
@@ -151,17 +152,35 @@ def process_food_item(
     item_information
 ):
 
+    pipeline_start = time.perf_counter()
+
+    print("\n========== ANALYZE PIPELINE START ==========", flush=True)
+    print(f"PIPELINE: image={image_path}", flush=True)
+
     # ========================================================
     # MODEL 1
     # ========================================================
+
+    print("PIPELINE 1: predict_food START", flush=True)
+    model1_start = time.perf_counter()
 
     food_name, food_confidence = (
         predict_food(image_path)
     )
 
+    print(
+        f"PIPELINE 1: predict_food DONE in "
+        f"{time.perf_counter() - model1_start:.2f}s -> "
+        f"{food_name} ({food_confidence:.2f}%)",
+        flush=True
+    )
+
     # ========================================================
     # MODEL 2 - VISUAL FRESHNESS
     # ========================================================
+
+    print("PIPELINE 2: predict_freshness START", flush=True)
+    model2_start = time.perf_counter()
 
     (
         good_percentage,
@@ -169,6 +188,13 @@ def process_food_item(
         visual_assessment
     ) = predict_freshness(
         image_path
+    )
+
+    print(
+        f"PIPELINE 2: predict_freshness DONE in "
+        f"{time.perf_counter() - model2_start:.2f}s -> "
+        f"{visual_assessment}",
+        flush=True
     )
 
     # ========================================================
@@ -220,6 +246,9 @@ def process_food_item(
     # MODEL 2 - RULE ASSESSMENT
     # ========================================================
 
+    print("PIPELINE 3: assess_food_condition START", flush=True)
+    rules_start = time.perf_counter()
+
     condition_result = (
         assess_food_condition(
             visual_assessment,
@@ -236,14 +265,37 @@ def process_food_item(
         ]
     )
 
+    print(
+        f"PIPELINE 3: assess_food_condition DONE in "
+        f"{time.perf_counter() - rules_start:.2f}s -> "
+        f"{final_assessment}",
+        flush=True
+    )
+
     # ========================================================
     # MODEL 3
     # ========================================================
+
+    print("PIPELINE 4: assess_recovery START", flush=True)
+    model3_start = time.perf_counter()
 
     recovery_result = assess_recovery(
         food_name,
         final_assessment
     )
+
+    print(
+        f"PIPELINE 4: assess_recovery DONE in "
+        f"{time.perf_counter() - model3_start:.2f}s",
+        flush=True
+    )
+
+    print(
+        f"PIPELINE: COMPLETE in "
+        f"{time.perf_counter() - pipeline_start:.2f}s",
+        flush=True
+    )
+    print("========== ANALYZE PIPELINE END ==========", flush=True)
 
     # ========================================================
     # RETURN COMPLETE ITEM RESULT

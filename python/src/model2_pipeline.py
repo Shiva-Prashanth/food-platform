@@ -1,6 +1,16 @@
 import os
 import sys
+import time
 from datetime import datetime
+
+# Keep the CPU-only ML service lightweight on small Render instances.
+# These must be set BEFORE importing TensorFlow/PyTorch.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 
 # ============================================================
@@ -15,8 +25,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 
-import numpy as np
-import tensorflow as tf
+# TensorFlow/NumPy are imported lazily below so the API can boot without
+# initializing the TensorFlow runtime before an analysis request.
 
 
 from rules.assessment_rules import (
@@ -51,6 +61,18 @@ food_model = None
 freshness_model = None
 
 
+def _load_tensorflow():
+    """Import TensorFlow only when the freshness model is actually needed."""
+    import tensorflow as tf
+    return tf
+
+
+def _load_numpy():
+    """Import NumPy only when the freshness model is actually needed."""
+    import numpy as np
+    return np
+
+
 # ============================================================
 # LOAD FOOD MODEL WHEN NEEDED
 # ============================================================
@@ -61,14 +83,29 @@ def get_food_model():
 
     if food_model is None:
 
+        print(
+            "MODEL 1: Hugging Face model LOAD START",
+            flush=True
+        )
+
+        load_start = time.perf_counter()
+
         from transformers import pipeline
 
         food_model = pipeline(
             "image-classification",
-            model="Subhash5/indian-food-classifier"
+            model="Subhash5/indian-food-classifier",
+            device=-1
+        )
+
+        print(
+            f"MODEL 1: Hugging Face model LOAD DONE in "
+            f"{time.perf_counter() - load_start:.2f}s",
+            flush=True
         )
 
     return food_model
+
 
 
 # ============================================================
@@ -81,13 +118,28 @@ def get_freshness_model():
 
     if freshness_model is None:
 
-        freshness_model = (
-            tf.keras.models.load_model(
-                FRESHNESS_MODEL_PATH
-            )
+        print(
+            "MODEL 2: TensorFlow model LOAD START",
+            flush=True
+        )
+
+        load_start = time.perf_counter()
+
+        tf = _load_tensorflow()
+
+        freshness_model = tf.keras.models.load_model(
+            FRESHNESS_MODEL_PATH,
+            compile=False
+        )
+
+        print(
+            f"MODEL 2: TensorFlow model LOAD DONE in "
+            f"{time.perf_counter() - load_start:.2f}s",
+            flush=True
         )
 
     return freshness_model
+
 
 
 # ============================================================
@@ -96,19 +148,21 @@ def get_freshness_model():
 
 def predict_food(image_path):
 
-    # --------------------------------------------------------
-    # Load food model only when prediction is requested
-    # --------------------------------------------------------
+    print("MODEL 1: predict_food START", flush=True)
+    start_time = time.perf_counter()
 
     model = get_food_model()
 
-    # The Hugging Face image-classification pipeline
-    # handles image loading and preprocessing.
-    predictions = model(
-        image_path
+    print(
+        "MODEL 1: running image classification",
+        flush=True
     )
 
-    # Get the highest-confidence prediction
+    predictions = model(
+        image_path,
+        top_k=1
+    )
+
     best_prediction = predictions[0]
 
     food_name = best_prediction["label"]
@@ -117,7 +171,15 @@ def predict_food(image_path):
         best_prediction["score"] * 100
     )
 
+    print(
+        f"MODEL 1: predict_food DONE in "
+        f"{time.perf_counter() - start_time:.2f}s -> "
+        f"{food_name} ({confidence:.2f}%)",
+        flush=True
+    )
+
     return food_name, confidence
+
 
 
 # ============================================================
@@ -126,11 +188,18 @@ def predict_food(image_path):
 
 def predict_freshness(image_path):
 
-    # --------------------------------------------------------
-    # Load freshness model only when prediction is requested
-    # --------------------------------------------------------
+    print("MODEL 2: predict_freshness START", flush=True)
+    start_time = time.perf_counter()
 
     model = get_freshness_model()
+
+    tf = _load_tensorflow()
+    np = _load_numpy()
+
+    print(
+        "MODEL 2: preparing image",
+        flush=True
+    )
 
     image = tf.keras.utils.load_img(
         image_path,
@@ -146,37 +215,44 @@ def predict_freshness(image_path):
         axis=0
     )
 
+    print(
+        "MODEL 2: running TensorFlow prediction",
+        flush=True
+    )
+
     prediction = model.predict(
         image_array,
         verbose=0
     )[0][0]
 
-    # bad = 0
-    # good = 1
+    good_percentage = float(prediction * 100)
 
-    good_percentage = prediction * 100
-
-    bad_percentage = (
+    bad_percentage = float(
         (1 - prediction) * 100
     )
 
     if good_percentage >= 70:
-
         visual_assessment = "GOOD"
 
     elif bad_percentage >= 70:
-
         visual_assessment = "BAD"
 
     else:
-
         visual_assessment = "UNCERTAIN"
+
+    print(
+        f"MODEL 2: predict_freshness DONE in "
+        f"{time.perf_counter() - start_time:.2f}s -> "
+        f"{visual_assessment}",
+        flush=True
+    )
 
     return (
         good_percentage,
         bad_percentage,
         visual_assessment
     )
+
 
 
 # ============================================================
