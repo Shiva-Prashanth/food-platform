@@ -6,6 +6,8 @@ from datetime import datetime
 # Keep the CPU-only ML service lightweight on small Render instances.
 # These must be set BEFORE importing TensorFlow/PyTorch.
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+os.environ.setdefault("USE_TF", "0")
+os.environ.setdefault("USE_TORCH", "1")
 os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
@@ -135,19 +137,6 @@ def get_food_model():
             flush=True
         )
 
-        print("MODEL 1: importing tensorflow START", flush=True)
-
-        tensorflow_start = time.perf_counter()
-
-        import tensorflow as tf
-
-        print(
-            "MODEL 1: importing tensorflow DONE - "
-            f"version={tf.__version__} - "
-            f"time={time.perf_counter() - tensorflow_start:.2f}s",
-            flush=True
-        )
-
         print("MODEL 1: importing pipeline START", flush=True)
 
         pipeline_start = time.perf_counter()
@@ -159,6 +148,7 @@ def get_food_model():
             f"time={time.perf_counter() - pipeline_start:.2f}s",
             flush=True
         )
+
         print(
             "MODEL 1: pipeline/model creation START",
             flush=True
