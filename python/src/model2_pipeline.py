@@ -89,18 +89,66 @@ def get_food_model():
 
         load_start = time.perf_counter()
 
+        # --------------------------------------------------------
+        # TEST 1: PyTorch import
+        # --------------------------------------------------------
+
+        print(
+            "MODEL 1: importing torch START",
+            flush=True
+        )
+
+        import torch
+
+        print(
+            "MODEL 1: importing torch DONE - "
+            f"version={torch.__version__} - "
+            f"time={time.perf_counter() - load_start:.2f}s",
+            flush=True
+        )
+
+        # --------------------------------------------------------
+        # TEST 2: Transformers import
+        # --------------------------------------------------------
+
+        transformers_start = time.perf_counter()
+
         print(
             "MODEL 1: importing transformers START",
+            flush=True
+        )
+
+        import transformers
+
+        print(
+            "MODEL 1: importing transformers DONE - "
+            f"version={transformers.__version__} - "
+            f"time={time.perf_counter() - transformers_start:.2f}s",
+            flush=True
+        )
+
+        # --------------------------------------------------------
+        # TEST 3: Pipeline import
+        # --------------------------------------------------------
+
+        pipeline_start = time.perf_counter()
+
+        print(
+            "MODEL 1: importing pipeline START",
             flush=True
         )
 
         from transformers import pipeline
 
         print(
-            "MODEL 1: importing transformers DONE in "
-            f"{time.perf_counter() - load_start:.2f}s",
+            "MODEL 1: importing pipeline DONE - "
+            f"time={time.perf_counter() - pipeline_start:.2f}s",
             flush=True
         )
+
+        # --------------------------------------------------------
+        # TEST 4: Actual model loading
+        # --------------------------------------------------------
 
         model_start = time.perf_counter()
 
@@ -116,14 +164,14 @@ def get_food_model():
         )
 
         print(
-            "MODEL 1: pipeline/model creation DONE in "
-            f"{time.perf_counter() - model_start:.2f}s",
+            "MODEL 1: pipeline/model creation DONE - "
+            f"time={time.perf_counter() - model_start:.2f}s",
             flush=True
         )
 
         print(
-            "MODEL 1: Hugging Face model LOAD DONE in "
-            f"{time.perf_counter() - load_start:.2f}s",
+            "MODEL 1: Hugging Face model LOAD DONE - "
+            f"total={time.perf_counter() - load_start:.2f}s",
             flush=True
         )
 
