@@ -1,4 +1,3 @@
-from src.batch_pipeline import process_food_item
 from flask import Flask, request, jsonify
 import os
 import sys
@@ -78,7 +77,7 @@ def health():
 
 @app.route("/analyze-food", methods=["POST"])
 def analyze_food():
-
+    from src.batch_pipeline import process_food_item
     temporary_image_path = None
 
     try:
