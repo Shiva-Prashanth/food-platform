@@ -15,13 +15,13 @@ ENV MKL_NUM_THREADS=1
 
 WORKDIR /app
 
-COPY python/requirements-cloudrun.txt .
+COPY requirements-cloudrun.txt .
 
 RUN pip install --no-cache-dir -r requirements-cloudrun.txt
 
-COPY python/src ./src
-COPY python/rules ./rules
-COPY python/models ./models
+COPY src ./src
+COPY rules ./rules
+COPY models ./models
 
 RUN useradd --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser /app
@@ -29,6 +29,8 @@ RUN useradd --create-home --shell /bin/bash appuser \
 USER appuser
 
 ENV PORT=8080
+
+EXPOSE 8080
 
 CMD exec gunicorn src.model_api:app \
     --bind 0.0.0.0:${PORT} \
