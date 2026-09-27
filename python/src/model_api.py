@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 import os
 import sys
@@ -240,10 +241,12 @@ def analyze_food():
         # ====================================================
         from src.batch_pipeline import process_food_item
 
-        result = process_food_item(
-            image_path,
-            item_information
-        )
+        print("========== ANALYZE START ==========", flush=True)
+        print("ANALYZE: calling process_food_item", flush=True)
+        result = process_food_item(image_path, item_information)
+
+        print("ANALYZE: process_food_item FINISHED", flush=True)
+        print("========== ANALYZE END ==========", flush=True)
 
         # ====================================================
         # RETURN RESULT
