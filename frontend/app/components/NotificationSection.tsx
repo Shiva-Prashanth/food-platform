@@ -92,7 +92,7 @@ export default function NotificationSection({
 
   const fetchReceivers = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/receivers");
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/receivers`);
       const data = await response.json();
 
       if (response.ok && Array.isArray(data.receivers)) {
@@ -155,7 +155,7 @@ export default function NotificationSection({
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/notifications/${selectedReceiverId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${selectedReceiverId}`
       );
 
       const data = await response.json();
@@ -217,7 +217,7 @@ export default function NotificationSection({
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/allocations/${donationId}/accept`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/allocations/${donationId}/accept`,
         {
           method: "POST",
           headers: {
