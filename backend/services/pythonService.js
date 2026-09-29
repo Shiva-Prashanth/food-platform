@@ -3,6 +3,7 @@ const fs = require("fs");
 const FormData = require("form-data");
 
 const PYTHON_SERVICE_URL =
+    process.env.PYTHON_SERVICE_URL ||
     process.env.PYTHON_API_URL ||
     "http://localhost:8000";
 
@@ -63,15 +64,18 @@ async function analyzeFood(foodData) {
         return response.data;
 
     } catch (error) {
-
         console.error(
             "Python service error:",
-            error.response?.data ||
-            error.message
+            error.response?.data || error.message
         );
 
+        const detail = error.response?.data?.message || error.response?.data?.error;
+        if (detail) {
+            throw new Error(`Python model error: ${detail}`);
+        }
+
         throw new Error(
-            "Unable to communicate with Python model service"
+            `Unable to communicate with Python model service at ${PYTHON_SERVICE_URL}. Please ensure the Python backend is running on port 8000.`
         );
     }
 }

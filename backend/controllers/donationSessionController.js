@@ -43,6 +43,14 @@ function needsHumanValidation(item, route) {
         item.analysis?.final_assessment === "manual_verification";
 }
 
+function formatErrorMessage(error) {
+    if (!error) return "An unknown error occurred";
+    if (error.code === 16 || error.message?.includes("UNAUTHENTICATED") || error.message?.includes("invalid_grant")) {
+        return "Database authentication failed: Firebase credentials are invalid or expired. Please check your backend Firebase configuration (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY or FIREBASE_SERVICE_ACCOUNT_PATH).";
+    }
+    return error.message || "An unexpected server error occurred";
+}
+
 async function createSession(req, res) {
     try {
         const session = await createDonationSession({
@@ -52,7 +60,7 @@ async function createSession(req, res) {
         res.status(201).json({ success: true, session });
     } catch (error) {
         console.error("Create donation session error:", error);
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
 }
 
@@ -63,7 +71,7 @@ async function getSession(req, res) {
         res.json({ success: true, session });
     } catch (error) {
         console.error("Get donation session error:", error);
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
 }
 
@@ -88,7 +96,7 @@ async function addItem(req, res) {
         res.status(201).json({ success: true, item });
     } catch (error) {
         console.error("Add donation session item error:", error);
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
 }
 
@@ -110,7 +118,7 @@ async function editItem(req, res) {
         res.json({ success: true, item: updatedItem });
     } catch (error) {
         console.error("Edit donation session item error:", error);
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
 }
 
@@ -124,7 +132,7 @@ async function removeItem(req, res) {
         res.json({ success: true, message: "Food item removed" });
     } catch (error) {
         console.error("Remove donation session item error:", error);
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
 }
 
@@ -175,7 +183,7 @@ async function analyzeSession(req, res) {
     } catch (error) {
         console.error("Analyze donation session error:", error);
         await updateDonationSession(req.params.sessionId, { status: "DRAFT" }).catch(() => { });
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
 }
 
@@ -309,7 +317,7 @@ async function confirmSession(req, res) {
         res.json({ success: true, session: finalSession, donations });
     } catch (error) {
         console.error("Confirm donation session error:", error);
-        res.status(500).json({ success: false, message: error.message });
+        res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
 }
 

@@ -41,6 +41,9 @@ ENV/
 # ==========================================
 backend/uploads/*
 !backend/uploads/.gitkeep
+python/uploads/*
+!python/uploads/.gitkeep
+python/data/*.db
 uploads/*
 !uploads/.gitkeep
 
