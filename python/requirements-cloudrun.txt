@@ -11,4 +11,4 @@ torch==2.13.0+cpu
 torchvision==0.28.0+cpu
 transformers==5.17.0
 
-tensorflow==2.21.0
+ai-edge-litert==2.2.0

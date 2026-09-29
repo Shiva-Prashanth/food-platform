@@ -76,33 +76,35 @@ def make_json_serializable(value):
 
 @app.route("/health", methods=["GET"])
 def health():
-    from src.model2_pipeline import food_model, freshness_model, _get_memory_info_str
+    import src.model2_pipeline as m2
     return jsonify({
         "success": True,
         "message": "Python model service is running",
         "timestamp": datetime.now().isoformat(),
-        "memory": _get_memory_info_str(),
+        "memory": m2._get_memory_info_str(),
         "models_status": {
-            "food_model_loaded": food_model is not None,
-            "freshness_model_loaded": freshness_model is not None
+            "food_model_loaded": m2.food_model is not None,
+            "freshness_model_loaded": m2.freshness_runner is not None
         }
     }), 200
 
 
 @app.route("/api/models/status", methods=["GET"])
 def models_status():
-    from src.model2_pipeline import food_model, freshness_model, _get_memory_info_str, HUGGINGFACE_MODEL_ID, FRESHNESS_MODEL_PATH
+    import src.model2_pipeline as m2
     return jsonify({
         "success": True,
         "food_model": {
-            "model_id": HUGGINGFACE_MODEL_ID,
-            "loaded": food_model is not None
+            "model_id": m2.HUGGINGFACE_MODEL_ID,
+            "loaded": m2.food_model is not None
         },
         "freshness_model": {
-            "path": FRESHNESS_MODEL_PATH,
-            "loaded": freshness_model is not None
+            "tflite_path": m2.FRESHNESS_TFLITE_PATH,
+            "keras_path": m2.FRESHNESS_KERAS_PATH,
+            "loaded": m2.freshness_runner is not None,
+            "backend": m2.freshness_runner.backend if m2.freshness_runner is not None else None
         },
-        "memory": _get_memory_info_str()
+        "memory": m2._get_memory_info_str()
     }), 200
 
 

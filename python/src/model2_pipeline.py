@@ -10,7 +10,7 @@ from datetime import datetime
 # CPU & MEMORY RUNTIME ENVIRONMENT CONFIGURATION
 # ============================================================
 # Keep the CPU-only ML service lightweight on cloud instances (e.g. Blitz.cloud).
-# These must be set BEFORE importing TensorFlow/PyTorch.
+# These must be set BEFORE importing PyTorch/TensorFlow.
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 os.environ.setdefault("USE_TF", "0")
 os.environ.setdefault("USE_TORCH", "1")
@@ -48,7 +48,13 @@ from src.model3_pipeline import assess_recovery
 
 HUGGINGFACE_MODEL_ID = "Subhash5/indian-food-classifier"
 
-FRESHNESS_MODEL_PATH = os.path.join(
+FRESHNESS_TFLITE_PATH = os.path.join(
+    PROJECT_ROOT,
+    "models",
+    "freshness_classifier.tflite"
+)
+
+FRESHNESS_KERAS_PATH = os.path.join(
     PROJECT_ROOT,
     "models",
     "freshness_classifier.keras"
@@ -64,7 +70,8 @@ _food_model_lock = threading.Lock()
 _freshness_model_lock = threading.Lock()
 
 food_model = None
-freshness_model = None
+freshness_runner = None  # Holds either TFLiteInterpreterRunner or KerasModelRunner
+freshness_model = None   # Compatibility alias for freshness_runner
 
 
 def _get_memory_info_str():
@@ -78,28 +85,63 @@ def _get_memory_info_str():
         return "RSS=N/A"
 
 
-def _load_tensorflow():
-    """Import and configure TensorFlow lazily only when needed."""
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [MODEL 2 - TF] Lazy importing TensorFlow ({_get_memory_info_str()})...", flush=True)
-    t_start = time.perf_counter()
-    import tensorflow as tf
-    try:
-        tf.config.threading.set_inter_op_parallelism_threads(1)
-        tf.config.threading.set_intra_op_parallelism_threads(1)
-    except Exception as tf_cfg_err:
-        print(f"[MODEL 2 - TF] Thread configuration warning: {tf_cfg_err}", flush=True)
-    print(
-        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [MODEL 2 - TF] TensorFlow imported - "
-        f"version={tf.__version__} - time={time.perf_counter() - t_start:.2f}s - {_get_memory_info_str()}",
-        flush=True
-    )
-    return tf
+# ============================================================
+# FRESHNESS RUNNER WRAPPERS (LITERT / TFLITE vs KERAS FALLBACK)
+# ============================================================
+
+class TFLiteFreshnessRunner:
+    """Lightweight runner using LiteRT / TFLite runtime (~10MB RAM vs ~500MB for TF)."""
+    def __init__(self, model_path):
+        self.model_path = model_path
+        self.interpreter = self._create_interpreter(model_path)
+        self.interpreter.allocate_tensors()
+        self.input_details = self.interpreter.get_input_details()
+        self.output_details = self.interpreter.get_output_details()
+        self.input_index = self.input_details[0]["index"]
+        self.output_index = self.output_details[0]["index"]
+        self.backend = "LiteRT/TFLite"
+
+    @staticmethod
+    def _create_interpreter(model_path):
+        # 1. Try Google LiteRT
+        try:
+            from ai_edge_litert.interpreter import Interpreter
+            return Interpreter(model_path=model_path)
+        except ImportError:
+            pass
+
+        # 2. Try tflite_runtime
+        try:
+            from tflite_runtime.interpreter import Interpreter
+            return Interpreter(model_path=model_path)
+        except ImportError:
+            pass
+
+        # 3. Fallback to tensorflow.lite
+        import tensorflow as tf
+        return tf.lite.Interpreter(model_path=model_path)
+
+    def predict(self, image_array):
+        self.interpreter.set_tensor(self.input_index, image_array)
+        self.interpreter.invoke()
+        return float(self.interpreter.get_tensor(self.output_index)[0][0])
 
 
-def _load_numpy():
-    """Import NumPy lazily only when needed."""
-    import numpy as np
-    return np
+class KerasFreshnessRunner:
+    """Fallback runner using standard Keras/TensorFlow model."""
+    def __init__(self, model_path):
+        self.model_path = model_path
+        import tensorflow as tf
+        try:
+            tf.config.threading.set_inter_op_parallelism_threads(1)
+            tf.config.threading.set_intra_op_parallelism_threads(1)
+        except Exception:
+            pass
+        self.model = tf.keras.models.load_model(model_path, compile=False)
+        self.backend = "Keras/TensorFlow"
+
+    def predict(self, image_array):
+        return float(self.model.predict(image_array, verbose=0)[0][0])
 
 
 # ============================================================
@@ -198,57 +240,64 @@ def get_food_model():
 
 
 # ============================================================
-# LOAD FRESHNESS MODEL (MODEL 2: KERAS TENSORFLOW)
+# LOAD FRESHNESS MODEL (MODEL 2: LITERT / TFLITE / KERAS)
 # ============================================================
 
 def get_freshness_model():
     """
-    Thread-safe lazy initialization of the Keras freshness classifier.
-    Reuses existing singleton instance across all subsequent requests in this worker.
+    Thread-safe lazy initialization of the Freshness classifier runner.
+    Prioritizes lightweight LiteRT/TFLite model for low memory footprint (~10MB),
+    falling back to Keras if TFLite is unavailable.
     """
-    global freshness_model
+    global freshness_runner, freshness_model
 
-    if freshness_model is not None:
-        return freshness_model
+    if freshness_runner is not None:
+        return freshness_runner
 
     with _freshness_model_lock:
-        if freshness_model is not None:
-            return freshness_model
+        if freshness_runner is not None:
+            return freshness_runner
 
         load_start = time.perf_counter()
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"\n[{timestamp}] ======================================================", flush=True)
         print(f"[{timestamp}] [MODEL 2 - INIT] Loading Freshness Classifier ({_get_memory_info_str()})", flush=True)
-        print(f"[{timestamp}] [MODEL 2 - INIT] Model Path: {FRESHNESS_MODEL_PATH}", flush=True)
-        print(f"[{timestamp}] ======================================================", flush=True)
 
-        if not os.path.exists(FRESHNESS_MODEL_PATH):
-            err_msg = f"Freshness model file not found on disk at: {FRESHNESS_MODEL_PATH}"
+        try:
+            # 1. Primary: Use lightweight TFLite model
+            if os.path.exists(FRESHNESS_TFLITE_PATH):
+                print(f"[{timestamp}] [MODEL 2 - INIT] Found LiteRT/TFLite model: {FRESHNESS_TFLITE_PATH}", flush=True)
+                runner = TFLiteFreshnessRunner(FRESHNESS_TFLITE_PATH)
+                print(
+                    f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [MODEL 2 - SUCCESS] LiteRT Freshness Classifier ready! "
+                    f"Load Time: {time.perf_counter() - load_start:.4f}s - Backend: {runner.backend} - Final {_get_memory_info_str()}",
+                    flush=True
+                )
+                freshness_runner = runner
+                freshness_model = runner
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ======================================================\n", flush=True)
+                return freshness_runner
+
+            # 2. Fallback: Use Keras model if TFLite model is not present
+            if os.path.exists(FRESHNESS_KERAS_PATH):
+                print(f"[{timestamp}] [MODEL 2 - INIT] LiteRT model not found, using Keras fallback: {FRESHNESS_KERAS_PATH}", flush=True)
+                runner = KerasFreshnessRunner(FRESHNESS_KERAS_PATH)
+                print(
+                    f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [MODEL 2 - SUCCESS] Keras Freshness Classifier ready! "
+                    f"Load Time: {time.perf_counter() - load_start:.2f}s - Backend: {runner.backend} - Final {_get_memory_info_str()}",
+                    flush=True
+                )
+                freshness_runner = runner
+                freshness_model = runner
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ======================================================\n", flush=True)
+                return freshness_runner
+
+            err_msg = f"No freshness model file found at either {FRESHNESS_TFLITE_PATH} or {FRESHNESS_KERAS_PATH}"
             print(f"[MODEL 2 - ERROR] {err_msg}", flush=True)
             raise FileNotFoundError(err_msg)
 
-        try:
-            tf = _load_tensorflow()
-            model_start = time.perf_counter()
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [MODEL 2 - STEP 1/2] Loading Keras model file...", flush=True)
-
-            loaded_model = tf.keras.models.load_model(
-                FRESHNESS_MODEL_PATH,
-                compile=False
-            )
-
-            freshness_model = loaded_model
-            gc.collect()
-
-            total_elapsed = time.perf_counter() - load_start
-            print(
-                f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [MODEL 2 - SUCCESS] Freshness Classifier ready! "
-                f"Total Load Time: {total_elapsed:.2f}s - Final {_get_memory_info_str()}",
-                flush=True
-            )
-            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ======================================================\n", flush=True)
-
         except Exception as error:
+            freshness_runner = None
             freshness_model = None
             total_elapsed = time.perf_counter() - load_start
             err_msg = str(error)
@@ -258,9 +307,9 @@ def get_freshness_model():
                 flush=True
             )
             traceback.print_exc()
-            raise RuntimeError(f"Keras freshness model initialization failed: {err_msg}") from error
+            raise RuntimeError(f"Freshness model initialization failed: {err_msg}") from error
 
-    return freshness_model
+    return freshness_runner
 
 
 # ============================================================
@@ -315,7 +364,7 @@ def predict_food(image_path):
 
 def predict_freshness(image_path):
     """
-    Run visual freshness assessment using the Keras TensorFlow model.
+    Run visual freshness assessment using lightweight LiteRT (or Keras fallback).
     """
     start_time = time.perf_counter()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -324,36 +373,26 @@ def predict_freshness(image_path):
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Image path does not exist for freshness prediction: {image_path}")
 
-    model = get_freshness_model()
-    tf = _load_tensorflow()
-    np = _load_numpy()
+    runner = get_freshness_model()
 
     try:
-        image = tf.keras.utils.load_img(
-            image_path,
-            target_size=IMAGE_SIZE
-        )
+        from PIL import Image
+        import numpy as np
 
-        image_array = tf.keras.utils.img_to_array(image)
-
-        # Handle images with alpha channel
-        if image_array.shape[-1] == 4:
-            image_array = image_array[:, :, :3]
-
+        # Lightweight Pillow image loading and resizing
+        img = Image.open(image_path).convert("RGB").resize(IMAGE_SIZE)
+        image_array = np.array(img, dtype=np.float32)
         image_array = np.expand_dims(image_array, axis=0)
 
-        prediction = model.predict(
-            image_array,
-            verbose=0
-        )[0][0]
+        prediction = runner.predict(image_array)
 
     except Exception as infer_err:
         print(f"[MODEL 2 - INFERENCE ERROR] Freshness prediction failed: {infer_err}", flush=True)
         traceback.print_exc()
         raise
 
-    good_percentage = float(prediction * 100)
-    bad_percentage = float((1.0 - prediction) * 100)
+    good_percentage = float(prediction * 100.0)
+    bad_percentage = float((1.0 - prediction) * 100.0)
 
     if good_percentage >= 70.0:
         visual_assessment = "GOOD"
@@ -365,7 +404,7 @@ def predict_freshness(image_path):
     elapsed = time.perf_counter() - start_time
     print(
         f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] [MODEL 2 - INFERENCE] predict_freshness DONE in "
-        f"{elapsed:.2f}s -> {visual_assessment} (Good: {good_percentage:.2f}%, Bad: {bad_percentage:.2f}%) ({_get_memory_info_str()})",
+        f"{elapsed:.4f}s -> {visual_assessment} (Good: {good_percentage:.2f}%, Bad: {bad_percentage:.2f}%) ({_get_memory_info_str()})",
         flush=True
     )
 
